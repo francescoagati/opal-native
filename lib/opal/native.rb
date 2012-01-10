@@ -63,11 +63,11 @@ class Module
   %x{
     function define_attr_bridge(klass, target, name, getter, setter) {
       if (getter) {
-        define_method(klass, mid_to_jsid(name), function() {
+        $opal.defn(klass, $opal.mid_to_jsid(name), function() {
           var real_target = target;
 
           if (target.$f & T_STRING) {
-            real_target = target[0] == '@' ? this[target.substr(1)] : this[mid_to_jsid(target)].apply(this, null);
+            real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
           }
 
           var result = real_target[name];
@@ -77,11 +77,11 @@ class Module
       }
 
       if (setter) {
-        define_method(klass, mid_to_jsid(name + '='), function (block, val) {
+        $opal.defn(klass, $opal.mid_to_jsid(name + '='), function (block, val) {
           var real_target = target;
 
           if (target.$f & T_STRING) {
-            real_target = target[0] == '@' ? this[target.substr(1)] : this[mid_to_jsid(target)].apply(this, null);
+            real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
           }
 
           return real_target[name] = val;
@@ -132,7 +132,7 @@ class Module
         var real_target = target;
 
         if (target.$f & T_STRING) {
-          real_target = target[0] == '@' ? this[target.substr(1)] : this[mid_to_jsid(target)].apply(this, null);
+          real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
         }
 
         return real_target.apply(this, $slice.call(arguments, 1));
@@ -142,7 +142,7 @@ class Module
 
   def define_method_bridge(object, name, ali = nil)
     %x{
-      define_method_bridge(this, object, mid_to_jsid(#{ali || name}), name);
+      define_method_bridge(this, object, $opal.mid_to_jsid(#{ali || name}), name);
       this.$methods.push(name);
 
       return nil;
