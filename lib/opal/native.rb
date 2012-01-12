@@ -53,7 +53,7 @@ module Native
 	def native_send (name, *args)
 		return method_missing(name, *args) unless Opal.function? `#@native[name]`
 
-		`#@native[$opal.mid_to_jsid(name)].apply(#@native, args)`
+		`#@native[name].apply(#@native, args)`
 	end
 
 	alias_method :__native_send__, :native_send
