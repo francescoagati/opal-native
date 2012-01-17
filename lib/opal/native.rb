@@ -8,15 +8,150 @@
 #  0. You just DO WHAT THE FUCK YOU WANT TO.
 #++
 
+class Module
+	%x{
+		function define_attr_bridge(klass, target, name, getter, setter) {
+			if (getter) {
+				$opal.defn(klass, $opal.mid_to_jsid(name), function() {
+					var real_target = target;
+
+					if (target.$f & T_STRING) {
+						real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
+					}
+
+					var result = real_target[name];
+
+					return result == null ? nil : result;
+				});
+			}
+
+			if (setter) {
+				$opal.defn(klass, $opal.mid_to_jsid(name + '='), function (block, val) {
+					var real_target = target;
+
+					if (target.$f & T_STRING) {
+						real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
+					}
+
+					return real_target[name] = val;
+				});
+			}
+		}
+	}
+
+	def attr_accessor_bridge (target, *attrs)
+		%x{
+			for (var i = 0, length = attrs.length; i < length; i++) {
+				define_attr_bridge(this, target, attrs[i], true, true);
+			}
+		}
+
+		self
+	end
+
+	def attr_reader_bridge (target, *attrs)
+		%x{
+			for (var i = 0, length = attrs.length; i < length; i++) {
+				define_attr_bridge(this, target, attrs[i], true, false);
+			}
+		}
+
+		self
+	end
+
+	def attr_reader_bridge (target, *attrs)
+		%x{
+			for (var i = 0, length = attrs.length; i < length; i++) {
+				define_attr_bridge(this, target, attrs[i], false, true);
+			}
+		}
+
+		self
+	end
+
+	def attr_bridge (target, name, setter = false)
+		`define_attr_bridge(this, target, name, true, setter)`
+
+		self
+	end
+
+	%x{
+		function define_method_bridge(klass, target, id, name) {
+			define_method(klass, id, function() {
+				var real_target = target;
+
+				if (target.$f & T_STRING) {
+					real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
+				}
+
+				return real_target.apply(real_target, arguments);
+			});
+		}
+	}
+
+	def define_method_bridge (object, name, ali = nil)
+		`define_method_bridge(this, object, $opal.mid_to_jsid(#{ali || name}), name)`
+
+		self
+	end
+end
+
 module Native
 	class Object
 		include Native
+		include Enumerable
 
-		def [](name)
+		def initialize (*)
+			super
+
+			%x{
+				for (var name in #@native) {
+					if (#{Opal.function? `#@native[name]`}) {
+						#{define_method_bridge @native, name}
+					}
+				}
+			}
+		end
+
+		def each
+			return enum_for :each unless block_given?
+
+			%x{
+				for (var name in #@native) {
+					#{yield `name`, `#@native[name]`}
+				}
+			}
+
+			self
+		end
+
+		def each_key
+			return enum_for :each_key unless block_given?
+
+			%x{
+				for (var name in #@native) {
+					#{yield `name`}
+				}
+			}
+
+			self
+		end
+
+		def each_value
+			return enum_for :each_value unless block_given?
+
+			%x{
+				for (var name in #@native) {
+					#{yield `#@native[name]`}
+				}
+			}
+		end
+
+		def [] (name)
 			`#@native[name]`
 		end
 
-		def []=(name, value)
+		def []= (name, value)
 			`#@native[name] = value`
 		end
 
@@ -56,95 +191,7 @@ module Native
 		`#@native[name].apply(#@native, args)`
 	end
 
-	alias_method :__native_send__, :native_send
-end
-
-class Module
-	%x{
-		function define_attr_bridge(klass, target, name, getter, setter) {
-			if (getter) {
-				$opal.defn(klass, $opal.mid_to_jsid(name), function() {
-					var real_target = target;
-
-					if (target.$f & T_STRING) {
-						real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
-					}
-
-					var result = real_target[name];
-
-					return result == null ? nil : result;
-				});
-			}
-
-			if (setter) {
-				$opal.defn(klass, $opal.mid_to_jsid(name + '='), function (block, val) {
-					var real_target = target;
-
-					if (target.$f & T_STRING) {
-						real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
-					}
-
-					return real_target[name] = val;
-				});
-			}
-		}
-	}
-
-	def attr_accessor_bridge(target, *attrs)
-		%x{
-			for (var i = 0, length = attrs.length; i < length; i++) {
-				define_attr_bridge(this, target, attrs[i], true, true);
-			}
-		}
-
-		self
-	end
-
-	def attr_reader_bridge(target, *attrs)
-		%x{
-			for (var i = 0, length = attrs.length; i < length; i++) {
-				define_attr_bridge(this, target, attrs[i], true, false);
-			}
-		}
-
-		self
-	end
-
-	def attr_reader_bridge(target, *attrs)
-		%x{
-			for (var i = 0, length = attrs.length; i < length; i++) {
-				define_attr_bridge(this, target, attrs[i], false, true);
-			}
-		}
-
-		self
-	end
-
-	def attr_bridge(target, name, setter = false)
-		`define_attr_bridge(this, target, name, true, setter)`
-
-		self
-	end
-
-	%x{
-		function define_method_bridge(klass, target, id, name) {
-			define_method(klass, id, function() {
-				var real_target = target;
-
-				if (target.$f & T_STRING) {
-					real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
-				}
-
-				return real_target.apply(this, $slice.call(arguments, 1));
-			});
-		}
-	}
-
-	def define_method_bridge(object, name, ali = nil)
-		`define_method_bridge(this, object, $opal.mid_to_jsid(#{ali || name}), name)`
-
-		self
-	end
+	alias __native_send__ native_send
 end
 
 class Object
@@ -155,7 +202,7 @@ end
 
 class Boolean
 	def to_native
-		`this.valueOf()`
+		`self.valueOf()`
 	end
 end
 
@@ -189,13 +236,13 @@ end
 
 class NilClass
 	def to_native
-		`var result; return result;`
+		`undefined`
 	end
 end
 
 class Numeric
 	def to_native
-		`this.valueOf()`
+		`self.valueOf()`
 	end
 end
 
@@ -203,7 +250,7 @@ class Proc
 	def to_native
 		%x{
 			return function () {
-				return this.apply(this.$S, arguments);
+				return self.apply(self.$S, arguments);
 			};
 		}
 	end
@@ -211,13 +258,13 @@ end
 
 class Regexp
 	def to_native
-		self
+		`self.valueOf()`
 	end
 end
 
 class String
 	def to_native
-		`this.valueOf()`
+		`self.valueOf()`
 	end
 end
 
