@@ -13,13 +13,13 @@ class Module
 		function define_attr_bridge (klass, target, name, getter, setter) {
 			if (getter) {
 				$opal.defn(klass, $opal.mid_to_jsid(name), function() {
-					var real_target = target;
+					var real = target;
 
-					if (#{Symbol == target}) {
-						real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
+					if (#{Symbol == `target`}) {
+						real = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this);
 					}
 
-					var result = real_target[name];
+					var result = real[name];
 
 					return result == null ? nil : result;
 				});
@@ -27,13 +27,13 @@ class Module
 
 			if (setter) {
 				$opal.defn(klass, $opal.mid_to_jsid(name + '='), function (block, val) {
-					var real_target = target;
+					var real = target;
 
-					if (#{Symbol === target}) {
-						real_target = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this, null);
+					if (#{Symbol === `target`}) {
+						real = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this);
 					}
 
-					return real_target[name] = val;
+					return real[name] = val;
 				});
 			}
 		}
@@ -75,20 +75,18 @@ class Module
 		self
 	end
 
-	%x{
-		function define_singleton_method_bridge (object, target, id, name) {
-			$opal.defs(object, id, method_bridge_generator(target, name));
-		}
-	}
-
 	def define_method_bridge (object, name, ali = nil)
 		%x{
-			$opal.defn(self, #{ali || name}, function () {
+			var self = this;
+
+			$opal.defn(self, $opal.mid_to_jsid(#{ali || name}), function () {
+				var real = object;
+
 				if (#{Symbol === object}) {
-					object = object[0] == '@' ? self[object.substr(1)] : this[$opal.mid_to_jsid(object)].apply(this);
+					real = object[0] == '@' ? self[object.substr(1)] : self[$opal.mid_to_jsid(object)].apply(self);
 				}
 
-				return object[name].apply(object, arguments);
+				return real[name].apply(real, arguments);
 			});
 		}
 
@@ -99,12 +97,16 @@ end
 module Kernel
 	def define_singleton_method_bridge (object, name, ali = nil)
 		%x{
-			$opal.defs(self, #{ali || name}, function () {
+			var self = this;
+
+			$opal.defs(this, $opal.mid_to_jsid(#{ali || name}), function () {
+				var real = object;
+
 				if (#{Symbol === object}) {
-					object = object[0] == '@' ? self[object.substr(1)] : this[$opal.mid_to_jsid(object)].apply(this);
+					real = object[0] == '@' ? self[object.substr(1)] : self[$opal.mid_to_jsid(object)].apply(self);
 				}
 
-				return object[name].apply(object, arguments);
+				return real[name].apply(real, arguments);
 			});
 		}
 
@@ -145,8 +147,8 @@ class Native::Object
 	include Native
 	include Enumerable
 
-	def initialize (*)
-		super
+	def initialize (native)
+		super(native)
 
 		update!
 	end
@@ -166,19 +168,15 @@ class Native::Object
 			define_singleton_method_bridge @native, name
 
 			if respond_to? "#{name}="
-				class << self
-					self
-				end.undef_method "#{name}="
+				singleton_class.undef_method "#{name}="
 			end
 		else
-			class << self
-				self
-			end.attr_reader_bridge @native, name
+			define_singleton_method name do
+				self[name]
+			end
 
 			define_singleton_method "#{name}=" do |value|
-				`#@native[name] = value`
-
-				update!(name)
+				self[name] = value
 			end
 		end
 	end
@@ -188,7 +186,7 @@ class Native::Object
 
 		%x{
 			for (var name in #@native) {
-				#{yield Object(`name`), Object(`#@native[name]`)}
+				#{yield Kernel.Object(`name`), Kernel.Object(`#@native[name]`)}
 			}
 		}
 
@@ -200,7 +198,7 @@ class Native::Object
 
 		%x{
 			for (var name in #@native) {
-				#{yield Object(`name`)}
+				#{yield Kernel.Object(`name`)}
 			}
 		}
 
@@ -212,17 +210,13 @@ class Native::Object
 
 		%x{
 			for (var name in #@native) {
-				#{yield Object(`#@native[name]`)}
+				#{yield Kernel.Object(`#@native[name]`)}
 			}
 		}
 	end
 
 	def [] (name)
-		value = `#@native[name]`
-
-		return if Opal.undefined? value
-
-		Object(value)
+		Kernel.Object(`#@native[name] || nil`)
 	end
 
 	def []= (name, value)
@@ -252,6 +246,12 @@ class Native::Object
 	end
 end
 
+module Kernel
+	def Object (object)
+		Opal.native?(object) ? Native::Object.new(object) : object
+	end
+end
+
 class Object
 	def to_native
 		raise TypeError, 'no specialized #to_native has been implemented'
@@ -260,7 +260,7 @@ end
 
 class Boolean
 	def to_native
-		`self.valueOf()`
+		`this.valueOf()`
 	end
 end
 
@@ -307,6 +307,8 @@ end
 class Proc
 	def to_native
 		%x{
+			var self = this;
+
 			return (function () {
 				return self.apply(self.$S, arguments);
 			});
@@ -323,11 +325,5 @@ end
 class String
 	def to_native
 		`this.valueOf()`
-	end
-end
-
-module Kernel
-	def Object(object)
-		Opal.native?(object) ? Native::Object.new(object) : object
 	end
 end
