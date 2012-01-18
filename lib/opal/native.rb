@@ -109,6 +109,9 @@ module Native
 					if (#{Opal.function? `#@native[name]`}) {
 						#{define_method_bridge @native, name}
 					}
+					else {
+						#{define_accessor_bridge @native, name}
+					}
 				}
 			}
 		end
@@ -118,7 +121,7 @@ module Native
 
 			%x{
 				for (var name in #@native) {
-					#{yield `name`, `#@native[name]`}
+					#{yield Object(`name`), Object(`#@native[name]`)}
 				}
 			}
 
@@ -130,7 +133,7 @@ module Native
 
 			%x{
 				for (var name in #@native) {
-					#{yield `name`}
+					#{yield Object(`name`)}
 				}
 			}
 
@@ -142,27 +145,41 @@ module Native
 
 			%x{
 				for (var name in #@native) {
-					#{yield `#@native[name]`}
+					#{yield Object(`#@native[name]`)}
 				}
 			}
 		end
 
 		def [] (name)
-			`#@native[name]`
+			Object(`#@native[name]`)
 		end
 
 		def []= (name, value)
-			`#@native[name] = value`
+			`#@native[name] = #{Opal.native?(value) ? value.to_native : value}`
 		end
 
 		def nil?
 			`#@native === null || #@native === undefined`
 		end
 
-		def method_missing (name, *args)
-			return super unless Opal.function? `#@native[name]`
+		def inspect
+			"#<Native: #{`#@native.toString()`}>"
+		end
 
-			__native_send__ name, *args
+		def to_s
+			`#@native.toString()`
+		end
+
+		def to_hash
+			Hash[to_a]
+		end
+
+		def method_missing (name, *args)
+			if Opal.function? `#@native[name]`
+				__native_send__ name, *args
+			else
+				self[name]
+			end
 		end
 	end
 
