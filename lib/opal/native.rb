@@ -147,8 +147,8 @@ class Native::Object
 	include Native
 	include Enumerable
 
-	def initialize (native)
-		super(native)
+	def initialize (*)
+		super
 
 		update!
 	end
