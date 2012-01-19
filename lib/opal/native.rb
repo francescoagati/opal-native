@@ -86,7 +86,7 @@ class Module
 					real = object[0] == '@' ? self[object.substr(1)] : self[$opal.mid_to_jsid(object)].apply(self);
 				}
 
-				return real[name].apply(real, arguments);
+				return real[name].apply(real, $slice.call(arguments, 1));
 			});
 		}
 
@@ -106,7 +106,7 @@ module Kernel
 					real = object[0] == '@' ? self[object.substr(1)] : self[$opal.mid_to_jsid(object)].apply(self);
 				}
 
-				return real[name].apply(real, arguments);
+				return real[name].apply(real, $slice.call(arguments, 1));
 			});
 		}
 
@@ -115,6 +115,10 @@ module Kernel
 end
 
 module Native
+	def self.=== (other)
+		`#{other} == null || !#{other}.o$klass`
+	end
+
 	def self.included (klass)
 		class << klass
 			def from_native (object)
@@ -134,8 +138,12 @@ module Native
 		@native
 	end
 
-	def native_send (name, *args)
-		return method_missing(name, *args) unless Opal.function? `#@native[name]`
+	def native_send (name, *args, &block)
+		unless Proc === `#@native[name]`
+			raise NoMethodError, "undefined method `#{name}` for #{`#@native.toString()`}"
+		end
+
+		args << block if block
 
 		`#@native[name].apply(#@native, args)`
 	end
@@ -153,6 +161,87 @@ class Native::Object
 		update!
 	end
 
+	def [] (name)
+		%x{
+			var value = #@native[name];
+
+			if (value == null) {
+				return nil;
+			}
+			else {
+				return #{Kernel.Native(`value`)}
+			}
+		}
+	end
+
+	def []= (name, value)
+		value = value.to_native unless Native === value
+
+		`#@native[name] = #{value}`
+
+		update!(name)
+
+		value
+	end
+
+	def each
+		return enum_for :each unless block_given?
+
+		%x{
+			for (var name in #@native) {
+				#{yield Kernel.Native(`name`), Kernel.Native(`#@native[name]`)}
+			}
+		}
+
+		self
+	end
+
+	def each_key
+		return enum_for :each_key unless block_given?
+
+		%x{
+			for (var name in #@native) {
+				#{yield Kernel.Native(`name`)}
+			}
+		}
+
+		self
+	end
+
+	def each_value
+		return enum_for :each_value unless block_given?
+
+		%x{
+			for (var name in #@native) {
+				#{yield Kernel.Native(`#@native[name]`)}
+			}
+		}
+	end
+
+	def inspect
+		"#<Native: #{`#@native.toString()`}>"
+	end
+
+	def keys
+		each_key.to_a
+	end
+
+	def nil?
+		`#@native === null || #@native === undefined`
+	end
+
+	def to_s
+		`#@native.toString()`
+	end
+
+	def to_hash
+		Hash[to_a]
+	end
+
+	def values
+		each_value.to_a
+	end
+
 	def update! (name = nil)
 		unless name
 			%x{
@@ -164,8 +253,22 @@ class Native::Object
 			return
 		end
 
-		if Opal.function? `#@native[name]`
-			define_singleton_method_bridge @native, name
+		if Proc === `#@native[name]`
+			define_singleton_method name do |*args, &block|
+				if block
+					block = proc {|*args|
+						block.call(*args.map { |o| Kernel.Native(o) })
+					}
+				end
+
+				args = args.map {|arg|
+					Proc === arg ? proc {|*args|
+						arg.call(*args.map { |o| Kernel.Native(o) })
+					} : arg
+				}
+
+				Kernel.Native(__native_send__(name, *args, &block))
+			end
 
 			if respond_to? "#{name}="
 				singleton_class.undef_method "#{name}="
@@ -180,75 +283,11 @@ class Native::Object
 			end
 		end
 	end
-
-	def each
-		return enum_for :each unless block_given?
-
-		%x{
-			for (var name in #@native) {
-				#{yield Kernel.Object(`name`), Kernel.Object(`#@native[name]`)}
-			}
-		}
-
-		self
-	end
-
-	def each_key
-		return enum_for :each_key unless block_given?
-
-		%x{
-			for (var name in #@native) {
-				#{yield Kernel.Object(`name`)}
-			}
-		}
-
-		self
-	end
-
-	def each_value
-		return enum_for :each_value unless block_given?
-
-		%x{
-			for (var name in #@native) {
-				#{yield Kernel.Object(`#@native[name]`)}
-			}
-		}
-	end
-
-	def [] (name)
-		Kernel.Object(`#@native[name] || nil`)
-	end
-
-	def []= (name, value)
-		value = value.to_native unless Opal.native?(value)
-
-		`#@native[name] = #{value}`
-
-		update!(name)
-
-		value
-	end
-
-	def nil?
-		`#@native === null || #@native === undefined`
-	end
-
-	def inspect
-		"#<Native: #{`#@native.toString()`}>"
-	end
-
-	def to_s
-		`#@native.toString()`
-	end
-
-	def to_hash
-		Hash[to_a]
-	end
 end
 
 module Kernel
-	def Object (object)
-		Opal.native?(object) ? Native::Object.new(object) : object
+	def Native (object)
+		Native === object ? Native::Object.new(object) : object
 	end
 end
 
@@ -266,7 +305,7 @@ end
 
 class Array
 	def to_native
-		map { |obj| Opal.object?(obj) ? obj.to_native : obj }
+		map { |obj| Object === obj ? obj.to_native : obj }
 	end
 end
 
@@ -280,7 +319,7 @@ class Hash
 				var key   = map[assoc][0],
 						value = map[assoc][1];
 
-				result[key] = #{Opal.native?(`value`)} ? value : #{`value`.to_native};
+				result[key] = #{Object === `value` ? `value`.to_native : `value`};
 			}
 
 			return result;
@@ -310,7 +349,13 @@ class Proc
 			var self = this;
 
 			return (function () {
-				return self.apply(self.$S, arguments);
+				var args = $slice.call(arguments, 1);
+
+				if (arguments[0]) {
+					args.push(arguments[0]);
+				}
+
+				return self.apply(self.$S, args);
 			});
 		}
 	end

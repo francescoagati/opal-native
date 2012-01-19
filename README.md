@@ -2,10 +2,10 @@ Opal support for automagical native bridging
 ============================================
 
 This gem gives to Opal a standard API to implement bridges to native objects and glue-less native
-access and usage with the 'Object()` helper function.
+access and usage with the 'Native()` helper function.
 
 ```ruby
-o = Object(`$opal`)
+o = Native(`$opal`)
 
 o.global.console            # this will access the global console object and return it
 o.global.console.log('wut') # this will call the log function on the console object
