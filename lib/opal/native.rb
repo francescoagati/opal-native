@@ -183,6 +183,8 @@ end
 
 module Kernel
 	def Native (object)
+		return if `object == null`
+
 		Native === object ? Native::Object.new(object) : object
 	end
 end
