@@ -25,6 +25,13 @@ describe Native::Object do
 		`#{@test.to_native} == #{@object}`.should be_true
 	end
 
+	it 'makes an accessor properly' do
+		@test.a.should == 42
+		@test.a = 23
+		@test.a.should == 23
+		`#@object.a`.should == 23
+	end
+
 	it 'calls a function as a method when present' do
 		@test.b.should == 42
 	end
