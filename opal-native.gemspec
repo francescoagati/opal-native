@@ -1,6 +1,6 @@
 Gem::Specification.new {|s|
 	s.name         = 'opal-native'
-	s.version      = '0.0.2'
+	s.version      = '0.0.3'
 	s.author       = 'meh.'
 	s.email        = 'meh@paranoici.org'
 	s.homepage     = 'http://github.com/opal/opal-native'
@@ -12,5 +12,5 @@ Gem::Specification.new {|s|
 	s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
 	s.require_paths = ['lib']
 
-	s.add_dependency 'opal-spec'
+	# s.add_dependency 'opal-spec'
 }
