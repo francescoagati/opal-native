@@ -70,16 +70,7 @@ class Native::Object
 	end
 
 	def [] (name)
-		%x{
-			var value = #@native[name];
-
-			if (value == null) {
-				return nil;
-			}
-			else {
-				return #{Kernel.Native(`value`)}
-			}
-		}
+		Kernel.Native(`#@native[name]`)
 	end
 
 	def []= (name, value)
