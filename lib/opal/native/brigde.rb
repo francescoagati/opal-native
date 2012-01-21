@@ -9,40 +9,60 @@
 #++
 
 class Module
-	%x{
-		function define_attr_bridge (klass, target, name, getter, setter) {
-			if (getter) {
-				$opal.defn(klass, $opal.mid_to_jsid(name), function() {
-					var real = target;
+	def define_attr_bridge (klass, target, name, getter, setter)
+		if getter
+			if Symbol === target
+				if target.start_with? '@'
+					define_method name do
+						object = instance_variable_get(target)
 
-					if (#{Symbol == `target`}) {
-						real = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this);
-					}
+						Kernel.Native(`#{Object === object ? object.to_native : object}[name]`)
+					end
+				else
+					define_method name do
+						object = __send__(target)
 
-					var result = real[name];
+						Kernel.Native(`#{Object === object ? object.to_native : object}[name]`)
+					end
+				end
+			else
+				define_method name do |*args, &block|
+					Kernel.Native(`target[name]`)
+				end
+			end
+		end
 
-					return result == null ? nil : result;
-				});
-			}
+		if setter
+			if Symbol === target
+				if target.start_with? '@'
+					define_method "#{name}=" do |value|
+						object = instance_variable_get(target)
+						value  = value.to_native if Object === value
 
-			if (setter) {
-				$opal.defn(klass, $opal.mid_to_jsid(name + '='), function (block, val) {
-					var real = target;
+						Kernel.Native(`#{Object === object ? object.to_native : object}[name] = value`)
+					end
+				else
+					define_method "#{name}=" do |value|
+						object = __send__(target)
+						value  = value.to_native if Object === value
 
-					if (#{Symbol === `target`}) {
-						real = target[0] == '@' ? this[target.substr(1)] : this[$opal.mid_to_jsid(target)].apply(this);
-					}
+						Kernel.Native(`#{Object === object ? object.to_native : object}[name] = value`)
+					end
+				end
+			else
+				define_method "#{name}=" do |value|
+					value = value.to_native if Object === value
 
-					return real[name] = val;
-				});
-			}
-		}
-	}
+					Kernel.Native(`target[name] = value`)
+				end
+			end
+		end
+	end
 
 	def attr_accessor_bridge (target, *attrs)
 		%x{
 			for (var i = 0, length = attrs.length; i < length; i++) {
-				define_attr_bridge(this, target, attrs[i], true, true);
+				#{define_attr_bridge(this, target, attrs[i], true, true)};
 			}
 		}
 
@@ -52,7 +72,7 @@ class Module
 	def attr_reader_bridge (target, *attrs)
 		%x{
 			for (var i = 0, length = attrs.length; i < length; i++) {
-				define_attr_bridge(this, target, attrs[i], true, false);
+				#{define_attr_bridge(this, target, attrs[i], true, false)};
 			}
 		}
 
@@ -62,7 +82,7 @@ class Module
 	def attr_writer_bridge (target, *attrs)
 		%x{
 			for (var i = 0, length = attrs.length; i < length; i++) {
-				define_attr_bridge(this, target, attrs[i], false, true);
+				#{define_attr_bridge(this, target, attrs[i], false, true)};
 			}
 		}
 
@@ -70,25 +90,29 @@ class Module
 	end
 
 	def attr_bridge (target, name, setter = false)
-		`define_attr_bridge(this, target, name, true, setter)`
+		define_attr_bridge(this, target, name, true, setter)
 
 		self
 	end
 
-	def define_method_bridge (object, name, ali = nil)
-		if Symbol === object
-			if object.start_with? ?@
+	def define_method_bridge (target, name, ali = nil)
+		if Symbol === target
+			if target.start_with? '@'
 				define_method ali || name do |*args, &block|
-					Native.send(instance_variable_get(object), name, *args, &block)
+					object = instance_variable_get(target)
+
+					Native.send(Object === object ? object.to_native : object, name, *args, &block)
 				end
 			else
 				define_method ali || name do |*args, &block|
-					Native.send(__send__(object), name, *args, &block)
+					object = __send__(target)
+
+					Native.send(Object === object ? object.to_native : object, name, *args, &block)
 				end
 			end
 		else
 			define_method ali || name do |*args, &block|
-				Native.send(object, name, *args, &block)
+				Native.send(target, name, *args, &block)
 			end
 		end
 
@@ -97,7 +121,9 @@ class Module
 end
 
 module Kernel
-	def define_singleton_method_bridge (*args)
-		singleton_class.define_method_bridge(*args)
+	def define_singleton_method_bridge (target, name, ali = nil)
+		define_singleton_method ali || name do |*args, &block|
+			Native.send(target, name, *args, &block)
+		end
 	end
 end
