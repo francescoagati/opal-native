@@ -16,14 +16,8 @@ module Native
 	def self.send (object, name, *args, &block)
 		args << block if block
 
-		args = args.map {|arg|
-			if Proc === arg
-				proc {|*args|
-					arg.call(*args.map { |o| Kernel.Native(o) })
-				}
-			else
-				arg
-			end
+		args = args.map {|obj|
+			Native === obj ? obj : obj.to_native
 		}
 
 		Kernel.Native(`object[name].apply(object, args)`)
@@ -194,7 +188,7 @@ end
 
 class Array
 	def to_native
-		map { |obj| Object === obj ? obj.to_native : obj }
+		map { |obj| Native === obj ? obj : obj.to_native }
 	end
 end
 
@@ -208,7 +202,7 @@ class Hash
 				var key   = map[assoc][0],
 						value = map[assoc][1];
 
-				result[key] = #{Object === `value` ? `value`.to_native : `value`};
+				result[key] = #{Native === `value` ? `value` : `value`.to_native};
 			}
 
 			return result;
@@ -238,13 +232,9 @@ class Proc
 			var self = this;
 
 			return (function () {
-				var args = $slice.call(arguments, 1);
-
-				if (arguments[0]) {
-					args.push(arguments[0]);
-				}
-
-				return self.apply(self.$S, args);
+				return self.apply(self.$S, [null].concat(#{
+					`$slice.call(arguments)`.map { |o| Kernel.Native(o) }
+				}));
 			});
 		}
 	end

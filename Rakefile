@@ -10,9 +10,9 @@ task :build => :dependencies do
 	Opal::Builder.new(files: 'lib', out: 'build/opal-native.js').build
 end
 
-desc 'Build latest opal-native ready for testing to build dir'
-task :test => :dependencies do
-	Opal::Builder.new(files: %w[lib spec], debug: true, out: 'build/opal-native.test.js').build
+desc 'Run specs in spec/'
+task :test => :build do
+  Opal::Context.runner 'spec/**/*.rb'
 end
 
 task :default => :build

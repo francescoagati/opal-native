@@ -9,20 +9,20 @@
 #++
 
 class Module
-	def define_attr_bridge (klass, target, name, getter, setter)
+	def define_attr_bridge (target, name, getter, setter)
 		if getter
 			if Symbol === target
 				if target.start_with? '@'
 					define_method name do
 						object = instance_variable_get(target)
 
-						Kernel.Native(`#{Object === object ? object.to_native : object}[name]`)
+						Kernel.Native(`#{Native === object ? object : object.to_native}[name]`)
 					end
 				else
 					define_method name do
 						object = __send__(target)
 
-						Kernel.Native(`#{Object === object ? object.to_native : object}[name]`)
+						Kernel.Native(`#{Native === object ? object : object.to_native}[name]`)
 					end
 				end
 			else
@@ -37,21 +37,21 @@ class Module
 				if target.start_with? '@'
 					define_method "#{name}=" do |value|
 						object = instance_variable_get(target)
-						value  = value.to_native if Object === value
+						value  = value.to_native unless Native === value
 
-						Kernel.Native(`#{Object === object ? object.to_native : object}[name] = value`)
+						Kernel.Native(`#{Native === object ? object : object.to_native}[name] = value`)
 					end
 				else
 					define_method "#{name}=" do |value|
 						object = __send__(target)
-						value  = value.to_native if Object === value
+						value  = value.to_native unless Native === value
 
-						Kernel.Native(`#{Object === object ? object.to_native : object}[name] = value`)
+						Kernel.Native(`#{Native === object ? object : object.to_native}[name] = value`)
 					end
 				end
 			else
 				define_method "#{name}=" do |value|
-					value = value.to_native if Object === value
+					value = value.to_native unless Native === value
 
 					Kernel.Native(`target[name] = value`)
 				end
@@ -60,37 +60,31 @@ class Module
 	end
 
 	def attr_accessor_bridge (target, *attrs)
-		%x{
-			for (var i = 0, length = attrs.length; i < length; i++) {
-				#{define_attr_bridge(this, target, attrs[i], true, true)};
-			}
+		attrs.each {|attr|
+			define_attr_bridge(target, attr, true, true)
 		}
 
 		self
 	end
 
 	def attr_reader_bridge (target, *attrs)
-		%x{
-			for (var i = 0, length = attrs.length; i < length; i++) {
-				#{define_attr_bridge(this, target, attrs[i], true, false)};
-			}
+		attrs.each {|attr|
+			define_attr_bridge(target, attr, true, false)
 		}
 
 		self
 	end
 
 	def attr_writer_bridge (target, *attrs)
-		%x{
-			for (var i = 0, length = attrs.length; i < length; i++) {
-				#{define_attr_bridge(this, target, attrs[i], false, true)};
-			}
+		attrs.each { |attr|
+			define_attr_bridge(target, attr, false, true)
 		}
 
 		self
 	end
 
 	def attr_bridge (target, name, setter = false)
-		define_attr_bridge(this, target, name, true, setter)
+		define_attr_bridge(target, name, true, setter)
 
 		self
 	end
@@ -101,13 +95,13 @@ class Module
 				define_method ali || name do |*args, &block|
 					object = instance_variable_get(target)
 
-					Native.send(Object === object ? object.to_native : object, name, *args, &block)
+					Native.send(Native === object ? object : object.to_native, name, *args, &block)
 				end
 			else
 				define_method ali || name do |*args, &block|
 					object = __send__(target)
 
-					Native.send(Object === object ? object.to_native : object, name, *args, &block)
+					Native.send(Native === object ? object : object.to_native, name, *args, &block)
 				end
 			end
 		else
