@@ -2,7 +2,7 @@ Opal support for automagical native bridging
 ============================================
 
 This gem gives to Opal a standard API to implement bridges to native objects and glue-less native
-access and usage with the 'Native()` helper function.
+access and usage with the `Native()` helper function.
 
 ```ruby
 o = Native(`$opal`)
