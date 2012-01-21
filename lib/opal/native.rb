@@ -63,6 +63,14 @@ class Native::Object
 		update!
 	end
 
+	def == (other)
+		`#@native == #{Native(other).to_native}`
+	end
+
+	def === (other)
+		Native::Object === other && `#@native == #{other.to_native}`
+	end
+
 	def [] (name)
 		Kernel.Native(`#@native[name]`)
 	end
