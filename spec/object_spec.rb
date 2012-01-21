@@ -22,7 +22,7 @@ describe Native::Object do
 	end
 
 	it 'wraps an object properly' do
-		@test.a.should == 42
+		`#{@test.to_native} == #{@object}`.should be_true
 	end
 
 	it 'calls a function as a method when present' do
