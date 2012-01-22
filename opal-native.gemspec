@@ -1,6 +1,6 @@
 Gem::Specification.new {|s|
 	s.name         = 'opal-native'
-	s.version      = '0.0.4'
+	s.version      = '0.0.4.1'
 	s.author       = 'meh.'
 	s.email        = 'meh@paranoici.org'
 	s.homepage     = 'http://github.com/opal/opal-native'
