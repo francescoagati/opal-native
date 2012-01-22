@@ -24,6 +24,8 @@ module Native
 	end
 
 	def self.included (klass)
+		return super if klass.respond_to? :from_native
+
 		class << klass
 			def from_native (object)
 				instance = allocate
