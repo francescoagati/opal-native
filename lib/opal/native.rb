@@ -13,6 +13,10 @@ module Native
 		`#{other} == null || !#{other}.o$klass`
 	end
 
+	def self.normalize (other)
+		Native === other ? other : other.to_native
+	end
+
 	def self.send (object, name, *args, &block)
 		args << block if block
 
@@ -173,7 +177,7 @@ class Native::Object
 				self[name] = value
 			end
 		end
-	end
+	rescue; end
 end
 
 module Kernel
