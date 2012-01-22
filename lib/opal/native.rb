@@ -241,7 +241,7 @@ class Proc
 
 			return (function () {
 				return self.apply(self.$S, [null].concat(#{
-					`$slice.call(arguments)`.map { |o| Kernel.Native(o) }
+					`$slice.call(arguments, 0)`.map { |o| Kernel.Native(o) }
 				}));
 			});
 		}
