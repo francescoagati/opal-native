@@ -40,8 +40,12 @@ module Native
 		end
 	end
 
-	def initialize (native)
-		@native = native
+	def initialize (value)
+		if `value == null`
+			raise ArgumentError, 'the passed value is null or undefined'
+		end
+
+		@native = value
 	end
 
 	def to_native
