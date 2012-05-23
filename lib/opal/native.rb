@@ -67,8 +67,12 @@ class Native::Object
 	include Native
 	include Enumerable
 
-	def initialize (*)
-		super
+	def initialize (value, options = {})
+		super(value)
+
+		if options[:only]
+			@only = options[:only].flatten.compact.uniq
+		end
 
 		update!
 	end
@@ -157,7 +161,7 @@ class Native::Object
 		unless name
 			%x{
 				for (var name in #@native) {
-					#{update!(`name`)}
+					#{update!(`name`) if !@only || @only.include?(name)}
 				}
 			}
 
@@ -185,10 +189,10 @@ class Native::Object
 end
 
 module Kernel
-	def Native (object)
+	def Native (object, *methods)
 		return if `object == null`
 
-		Native === object ? Native::Object.new(object) : object
+		Native === object ? Native::Object.new(object, only: methods) : object
 	end
 end
 
